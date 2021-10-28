@@ -73,13 +73,13 @@ int main() {
     //建立连接
     init_mysql();
     //获取外键列表
-    list<foreign_key> foreigin_list= query_foreignkey(table_name);
+    list<foreign_key> foreign_list= query_foreignkey(table_name);
     //关闭数据库链接
     close_mysql();
     //输出阶段
-    cout<<"----外键共有："<<foreigin_list.size()<<"个----"<<endl;
+    cout<<"----外键共有："<<foreign_list.size()<<"个----"<<endl;
     list<list<foreign_key>>::iterator it;
-    for(list<foreign_key>::iterator it=foreigin_list.begin();it!=foreigin_list.end();it++){
+    for(list<foreign_key>::iterator it=foreign_list.begin();it!=foreign_list.end();it++){
         cout<<"-------------------------------------"<<endl;
         cout<<"外键名为："<<it->constraint_name<<endl;
         cout<<"外键列名："<<it->column_name<<endl;
