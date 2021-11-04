@@ -18,11 +18,15 @@ public:
     MYSQL_RES *result;
     //查询的数据库名，目前是类中指定，可以后期更改
     string QUERY_SCHEMA="usedbookstore";
-    //外键结构体
+    /**
+     * 查询A表，对应B表
+     */
     struct foreign_key{
-        string table_name;
-        string column_name;
+        string btable_name;
+        string bcolumn_name;
         string constraint_name;
+        string acolumn_name;
+        string atable_name;
     };
     //表中字段结构体
     struct table_info{
@@ -62,12 +66,16 @@ void DBUtils::close_mysql() {
     ----外键共有：2个----
     -------------------------------------
     外键名为：ccid
-    外键列名：cid
+    查询表的表名:cfoucuss
+    查询表中外键列名：cid
     外键对应表名:customerinfo
+    对应表中外键列名：cid
     -------------------------------------
     外键名为：csid
-    外键列名：sid
+    查询表的表名:cfoucuss
+    查询表中外键列名：sid
     外键对应表名:storeinfo
+    对应表中外键列名：sid
     -------------------------------------
  */
 list<DBUtils::foreign_key> DBUtils::query_foreignkey(string TABLE_NAME) {
@@ -76,7 +84,7 @@ list<DBUtils::foreign_key> DBUtils::query_foreignkey(string TABLE_NAME) {
     MYSQL_FIELD *field = NULL;
     MYSQL_ROW row;
     string sql =
-            "select REFERENCED_TABLE_NAME,CONSTRAINT_NAME,REFERENCED_COLUMN_NAME from information_schema.key_column_usage t where t.constraint_schema='" +
+            "select REFERENCED_TABLE_NAME,CONSTRAINT_NAME,REFERENCED_COLUMN_NAME,COLUMN_NAME from information_schema.key_column_usage t where t.constraint_schema='" +
             QUERY_SCHEMA +
             "' and t.constraint_name in (SELECT CONSTRAINT_NAME FROM information_schema.TABLE_CONSTRAINTS where CONSTRAINT_SCHEMA='" +
             QUERY_SCHEMA + "' and CONSTRAINT_TYPE='FOREIGN KEY' and TABLE_NAME='" + TABLE_NAME + "')";
@@ -89,9 +97,11 @@ list<DBUtils::foreign_key> DBUtils::query_foreignkey(string TABLE_NAME) {
     while ((row = mysql_fetch_row(result))) {
         //do something with row[name_field]
         foreign_key foreignKey1;
-        foreignKey1.column_name = row[2];
+        foreignKey1.bcolumn_name = row[2];
         foreignKey1.constraint_name = row[1];
-        foreignKey1.table_name = row[0];
+        foreignKey1.btable_name = row[0];
+        foreignKey1.acolumn_name=row[3];
+        foreignKey1.atable_name=TABLE_NAME;
         foreign_list.push_back(foreignKey1);
     }
     close_mysql();
@@ -184,8 +194,10 @@ int main(){
     for(list<DBUtils::foreign_key>::iterator it=foreign_list.begin();it!=foreign_list.end();it++){
         cout<<"-------------------------------------"<<endl;
         cout<<"外键名为："<<it->constraint_name<<endl;
-        cout<<"外键列名："<<it->column_name<<endl;
-        cout<<"外键对应表名:"<<it->table_name<<endl;
+        cout<<"查询表的表名:"<<it->atable_name<<endl;
+        cout<<"查询表中外键列名："<<it->acolumn_name<<endl;
+        cout<<"外键对应表名:"<<it->btable_name<<endl;
+        cout<<"对应表中外键列名："<<it->bcolumn_name<<endl;
     }
     cout<<"-------------------------------------"<<endl;
     //测试查询数据库表名
