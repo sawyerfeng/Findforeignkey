@@ -5,6 +5,8 @@
 #include"mysql.h"
 #include<string>
 #include<list>
+#include<vector>
+#include <iomanip>
 using namespace std;
 
 class DBUtils{
@@ -38,6 +40,7 @@ public:
     list<foreign_key> query_foreignkey(string TABLE_NAME);
     list<string> query_tablename(string database_name);
     list<table_info> query_tableinfo(string table_name);
+    vector<vector<string>> query_tabledata(string table_name);
 };
 
 void DBUtils::init_mysql() {
@@ -55,6 +58,7 @@ void DBUtils::init_mysql() {
 void DBUtils::close_mysql() {
     mysql_close(&mysql_conn);
     mysql_free_result(result);
+    result=NULL;
     cout << "----MySQL断开连接----" << endl;
 }
 /**
@@ -160,7 +164,6 @@ list<string> DBUtils::query_tablename(string database_name) {
     -------------------------------------
     表中字段为为：role--数据类型为:enum
     -------------------------------------
-
  */
 list<DBUtils::table_info> DBUtils::query_tableinfo(string table_name) {
     init_mysql();
@@ -181,12 +184,64 @@ list<DBUtils::table_info> DBUtils::query_tableinfo(string table_name) {
     }
     close_mysql();
     return tableinfo_list;
-
+}
+/***
+ * 查询表中字段，并按照查询table_info中顺序输出
+ * Input:查询表的名字
+ * Output:vector<vector<string>>，输出table_info顺序的字段信息
+ *eg:
+ *  ----查询的是cid,cname,csex,birth,motto,cmoney,tel,结果如下:
+    20004 王建新 男 1997-02-15 好好学习. 45.000 18239165907
+    20008 "" "" null "" 4000.000 99998888777
+    20009 李澳 男 1999-12-14 学习使我快乐 450.000 15824827198
+    20010 李淑婉 女 1999-01-01 不吃饭则饥，不读书则愚。 100.000 13509230000
+    20012 李咏德 男 1999-01-01 不能则学，不知则问，耻于问人，决无长进。 100.000 13509230001
+    20013 李红英 女 1999-01-01 不听指点，多绕弯弯。不懂装懂，永世饭桶。 100.000 13509230002
+    20014 李新荣 男 1999-01-01 不问的人永远和愚昧在一起。 100.000 13509230003
+ */
+vector<vector<string>> DBUtils::query_tabledata(string table_name) {
+    list<table_info> tableinfo_list=query_tableinfo(table_name);
+    string columns;
+    int num=tableinfo_list.size();
+    list<table_info>::iterator it;
+    for(it=tableinfo_list.begin();it!=tableinfo_list.end();it++){
+        columns.append(it->column_name);
+        columns.append(",");
+    }
+    string sql="SELECT "+columns.substr(0,columns.size()-1)+" FROM "+table_name;
+    cout<<sql;
+    init_mysql();
+    MYSQL_FIELD *field = NULL;
+    MYSQL_ROW row;
+    if (!mysql_query(&mysql_conn, sql.c_str()))  //若查询成功返回0，失败返回随机数
+    {
+        cout << "----查询表字段成功----" << endl;
+        cout<<"----查询的是"+columns+"结果如下:"<<endl;
+    }else
+        cout<<"查询失败";
+    result = mysql_store_result(&mysql_conn);//将查询到的结果集储存到result中
+    int num_fields = mysql_num_fields(result);
+    vector<vector<string>> tabledata_list;
+    while ((row = mysql_fetch_row(result))) {
+        vector<string> table_data;
+        for(int i=0;i<num_fields;i++){
+            if(row[i]==NULL)
+                table_data.push_back("null");
+            else if(!strcmp(row[i]," "))
+                table_data.push_back("\"\"");
+            else
+                table_data.push_back(row[i]);
+        }
+        tabledata_list.push_back(table_data);
+    }
+    close_mysql();
+    return tabledata_list;
 }
 int main(){
-    string table_name="cfoucuss";
+    string table_name="customerinfo";
     string database_name="usedbookstore";
     DBUtils dbUtils;
+    
     //测试查询外键
     list<DBUtils::foreign_key> foreign_list=dbUtils.query_foreignkey(table_name);
     cout<<"----外键共有："<<foreign_list.size()<<"个----"<<endl;
@@ -221,4 +276,13 @@ int main(){
     }
     cout<<"-------------------------------------"<<endl;
 
+    //测试查询数据
+    vector<vector<string>> tabledata_list =dbUtils.query_tabledata(table_name);
+    cout<<setiosflags(ios::left);
+    for(int i=0;i<tabledata_list.size();i++){
+        for(int j=0;j<tabledata_list[i].size();j++){
+            cout<<tabledata_list[i][j]<<" ";
+        }
+        cout<<endl;
+    }
 }
