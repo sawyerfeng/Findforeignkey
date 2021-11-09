@@ -23,9 +23,10 @@ private:
     int port;
 public:
     MYSQL mysql_conn;
-    MYSQL_RES *result=NULL;
+    MYSQL_RES *result;
     //查询的数据库名，目前是类中指定，可以后期更改
     string QUERY_SCHEMA;
+    float threshold=0.6;
     //用到的结构体
     //外键结构体
     struct foreign_key{
@@ -56,6 +57,7 @@ public:
     list<table_info> query_tableinfo(string table_name);
     vector<vector<string>> query_rowtabledata(string table_name);
     map<string,vector<string>> query_coltabledata(string table_name);
+    map<string ,vector<string>> find_relation(string table_name);
 };
 
 void utils::init_mysql() {
@@ -72,8 +74,9 @@ void utils::init_mysql() {
 void utils::close_mysql() {
     mysql_close(&mysql_conn);
     mysql_free_result(result);
-    result=NULL;
+    cout<<"dsad";
     cout << "----MySQL断开连接----" << endl;
+    cout<<"22";
 }
 
 /**
@@ -257,14 +260,11 @@ vector<vector<string>> utils::query_rowtabledata(string table_name) {
  */
 map<string, vector<string>> utils::query_coltabledata(string table_name) {
     list<table_info> tableinfo_list=query_tableinfo(table_name);
-    int num=tableinfo_list.size();
     init_mysql();
     list<table_info>::iterator it;
     map<string,vector<string>> table_map;
+    MYSQL_ROW row;
     for(it=tableinfo_list.begin();it!=tableinfo_list.end();it++){
-        result=NULL;
-        MYSQL_FIELD *field = NULL;
-        MYSQL_ROW row;
         string sql="SELECT "+it->column_name+" FROM "+table_name;
         if (!mysql_query(&mysql_conn, sql.c_str()))  //若查询成功返回0，失败返回随机数
         {
@@ -286,6 +286,100 @@ map<string, vector<string>> utils::query_coltabledata(string table_name) {
     }
     close_mysql();
     return table_map;
+}
+/**
+ *找属性间的相似度，并且分组
+ * 返回map<string,vector<string>>,key是group1、2，vector是分组的属性名
+ */
+map<string, vector<string>> utils::find_relation(string table_name) {
+    cout<<"1";
+    map<string ,vector<string>> table_coldata=query_coltabledata(table_name);
+    cout<<"2giao"<<endl;
+    map<string,vector<string>>::iterator  it1;
+    map<string,vector<string>>::iterator  it2;
+    int row_num=table_coldata.begin()->second.size();
+    vector<string> colname;
+    int flag=0;
+    int i=0,j=1;
+    for(it1=table_coldata.begin();it1!=table_coldata.end();it1++){
+        colname.push_back(it1->first);
+    }
+    int col_num=colname.size();
+    int vis[col_num];
+    memset(vis,0,sizeof(vis));
+    //横向移动加纵向比较
+    for(it1=table_coldata.begin();it1!=table_coldata.end();it1++){
+        //跳过i=end的情况
+        if(it1==table_coldata.end()){
+            break;
+        }
+        for(it2=it1;it2!=table_coldata.end();it2++){
+            if(it2==it1){
+                //跳过i=j的情况
+                continue;
+            }
+            //计算相似度
+            int equal=0;
+            int tol=row_num;
+            for(int t=0;t<row_num;t++){
+    //记录分组信息
+                  if(it1->second[t].compare(it2->second[t])==0) {
+                      equal++;
+                  }
+            }
+            /***
+             * 分组算法：
+             * vis[i]初始全部为0
+             * 如果i和j属性相似，且vis[i],vis[j]都为0，则让flag++，并且让vis[i]=vis[j]=flag。
+             * 如果i和j属性相似，且vis[i]!=vis[j]，则让为0的等于不为0的。
+             * 每一个flag是一个分组，最后vis[]中，相等的是一组，为0的单独分组
+             */
+            if((double)equal/tol>=threshold){
+                if(vis[i]==0&&vis[j]==0){
+                    flag++;
+                    vis[i]=flag;
+                    vis[j]=flag;
+                }else if(vis[i]!=0&&vis[j]==0){
+                    vis[j]=vis[i];
+                }else if(vis[i]==0&&vis[j]!=0){
+                    vis[i]=vis[j];
+                }
+            }
+            j++;
+        }
+        i++;
+        j=i+1;
+    }
+    map<string,vector<string>> group_map;
+    int t=1;
+    //通过vis值实现分组
+    for(int i=1;i<=flag;i++){
+        vector<string> group;
+        for(int j=0;j<col_num;j++){
+            if(vis[j]==i) group.push_back(colname[j]);
+        }
+        string key_string="group";
+        key_string.append(to_string(t));
+        cout<<key_string;
+        group_map.insert(pair<string,vector<string>>(key_string, group));
+        t++;
+    }
+    for(int i=0;i<col_num;i++){
+        if(vis[i]==0){
+            vector<string> group;
+            string key_string="group";
+            key_string.append(to_string(t));
+            cout<<key_string;
+            cout<<i<<colname[i]<<endl;
+            group.push_back(colname[i]);
+            group_map.insert(pair<string,vector<string>>(key_string, group));
+            t++;
+        }
+    }
+    //map<int,vector<string>> group_map;
+    return group_map;
+
+
 }
 
 #endif //DBUTILS_UTILS_H
